@@ -1,0 +1,77 @@
+TARGET = $(if $(MAKECMDGOALS), $(firstword $(MAKECMDGOALS)),all)
+
+OBJS = $(subst .c,.o,$(filter %.c,$(SRC)))
+OBJS += $(subst .s,.o,$(filter %.s,$(SRC)))
+OBJECTS= $(addprefix $(OBJDIR)/,$(OBJS))
+
+LIBRARIES := $(foreach libs, $(INCLUDELIB), $($(libs)_PATH)/$(OBJDIR)/$(LIBPREFIX)$(libs)$(LIBEXT))
+
+# First target , even declared as PHONY is update
+.PHONY: all
+ifdef BUILDAPP
+EXE := $(OBJDIR)/$(BUILDAPP)
+
+all: $(EXE)
+
+$(EXE): $(OBJDIR) $(OBJECTS) $(INCLUDELIB)
+	$(LD) -o $(EXE) --gc-sections --entry $(ENTRY) -T $(LDFILE) -Map=$(EXE).map $(OBJECTS) $(LIBRARIES) '${LIBM}' '${LIBC}' '${LIBGCC}'
+	${OBJCOPY} -O binary ${@} ${@:.axf=.bin}
+endif
+
+
+ifdef LIBRARY
+LIBNAME := $(addprefix $(OBJDIR)/, $(addprefix $(LIBPREFIX),$(addsuffix $(LIBEXT), $(LIBRARY))))
+
+all: $(LIBNAME)
+	 echo $(LIBNAME)
+
+$(LIBNAME): $(OBJDIR) $(OBJECTS) $(INCLUDELIB)
+	 $(AR) rvs $@ $(OBJECTS)
+endif
+
+ifdef INCLUDELIB
+INCLUDELIBFILES := $(foreach libs, $(INCLUDELIB), $($(libs)_PATH)/$(OBJDIR)/$(LIBPREFIX)$(libs)$(LIBEXT))
+endif
+
+#$(OBJECTS): | $(OBDIR)
+
+DEPS := $(OBJS:.o=.d)
+DEPSO := $(addprefix $(OBJDIR)/,$(DEPS))
+
+-include $(DEPSO)
+
+$(OBJDIR):
+	@echo creating objdir
+	md /s $(subst /,\,$(OBJDIR))
+
+$(OBJDIR)/%.o:$(SRCDIR)/%.s
+	 $(CC) -c -g -$(AFLAGS) $< -o $@
+
+$(OBJDIR)/%.o:$(SRCDIR)/%.c
+	$(CC) -c -g  $(CFLAGS) $< -o $@
+	$(CC) -g  $(CFLAGS) -MM -MT $(OBJDIR)/$*.o -MF $(patsubst %.o,%.d,$@) $<
+
+$(OBJDIR)/%.a:$(OBJDIR)/%.o
+	 $(AR) rvs $@ $<
+
+
+
+.PHONY: subdirs $(INCLUDELIB)
+
+subdirs: $(INCLUDELIB)
+
+$(INCLUDELIB):
+	$(MAKE) -C $($@_PATH) $(MAKECMDGOALS)
+
+.PHONY: cleanall
+cleanall: $(INCLUDELIB)
+	-del /S /F  /E $(subst /,\,$(OBJDIR))
+#	-rm -rf $(subst /,/,$(OBJDIR))
+
+.PHONY: clean
+clean:
+	-del /S /F  /E $(subst /,\,$(OBJDIR))
+#	-rm -rf $(subst /,/,$(OBJDIR))
+
+
+

@@ -1,0 +1,78 @@
+ifndef APARTURE
+  $(error RAG not defined.)
+endif
+
+PART=TM4C1231E6PM
+#PART=TM4C123GH6PGE
+OBJCOPY=arm-none-eabi-objcopy
+
+CC=arm-none-eabi-gcc
+AR=arm-none-eabi-ar
+LD=arm-none-eabi-ld
+
+LDFILE=linkerscript/tmapp.ld
+ENTRY=ResetISR
+
+CPU=-mcpu=cortex-m4
+FPU=-mfpu=fpv4-sp-d16 -mfloat-abi=softfp
+
+CFLAGS=-mthumb             \
+       ${CPU}              \
+       ${FPU}              \
+       -ffunction-sections \
+       -fdata-sections     \
+       -MD                 \
+       -std=c99            \
+       -Wall               \
+       -pedantic           \
+       -DPART_${PART}      \
+       -c
+
+AFLAGS=-mthumb \
+       ${CPU}  \
+       ${FPU}  \
+       -MD
+
+# Get the location of libgcc.a from the GCC front-end.
+#
+LIBGCC:=${shell ${CC} ${CFLAGS} -print-libgcc-file-name}
+
+#
+# Get the location of libc.a from the GCC front-end.
+#
+LIBC:=${shell ${CC} ${CFLAGS} -print-file-name=libc.a}
+
+#
+# Get the location of libm.a from the GCC front-end.
+#
+LIBM:=${shell ${CC} ${CFLAGS} -print-file-name=libm.a}
+
+
+IPATH=.
+#IPATH+=inc
+#IPATH+=driverlib
+
+CFLAGS+=${patsubst %,-I%,${subst :, ,${IPATH}}}
+AFLAGS+=${patsubst %,-I%,${subst :, ,${IPATH}}}
+
+CFLAGS+=-DTARGET_IS_BLIZZARD_RB1
+ifeq ($(APARTURE), RAG)
+  CFLAGS+=-DAPARTURE
+endif
+
+SRCDIR=src
+HEADERS=inc
+OBJDIR=obj
+OBDIR=objdir
+
+ifdef DEBUG
+CFLAGS += -DDEBUG
+OBJDIR=obj\arm\debug
+else
+CFLAGS += -O2
+OBJDIR=obj\arm\release
+endif
+
+LIBEXT =.a
+LIBPREFIX = lib
+
